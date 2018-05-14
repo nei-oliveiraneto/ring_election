@@ -23,6 +23,8 @@ main(int argc, char** argv)
 
   if ( my_rank == 0 ) // qual o meu papel: sou o mestre ou um dos escravos?
      {
+        double t1,t2;
+        t1 = MPI_Wtime();  // inicia a contagem do tempo
      // papel do mestre
 
      // mostro o saco
@@ -62,6 +64,9 @@ main(int argc, char** argv)
      printf("\nMestre[%d]: ", my_rank);               
      for ( i=0 ; i < 15 ; printf("%d ", saco[i++]));
      printf("\n\n");
+     
+     t2 = MPI_Wtime(); // termina a contagem do tempo
+     printf("\nTempo de execucao: %f\n\n", t2-t1);
      }                 
   else                 
      {
