@@ -46,22 +46,6 @@ int getNextActiveProcess( )
    return -1; //all processes but the my_id are dead
 }
 
-int getPreviousActiveProcess( )
-{
-   int previous_proc;
-   int i;
-   for( i = 1; i < total_proc; i++ )
-   {
-      if( my_id-i < 0 )
-         previous_proc = total_proc + my_id - i;
-      else
-         previous_proc = my_id - i;
-      if( (allProcessStatus[previous_proc] == ACTIVE_PROC) || (allProcessStatus[previous_proc] == COORDENATOR_PROC)  )
-         return previous_proc;
-   }
-   return -1; //all processes but the my_id are dead
-}
-
 void disableCurrentCoordenator( )
 {
    int i;
@@ -99,12 +83,11 @@ main(int argc, char** argv)
    
    // ********* TEST AREA *********** // 
    
-   if(my_id==0)
+   if(my_id==3)
    {
-      allProcessStatus[3] = DISABLED_PROC;
       sentMessage.sender = -1;
-      sentMessage.receiver = 0;
-      sentMessage.data  = 3;
+      sentMessage.receiver = 4;
+      sentMessage.data  = 5;
       sentMessage.msgType = PROCESS_DIED_MSG;
       MPI_Send( &sentMessage, sizeof(struct Message), MPI_CHAR, getNextActiveProcess( ), TEMP_TAG, MPI_COMM_WORLD);
    }
@@ -114,18 +97,18 @@ main(int argc, char** argv)
    {
       MPI_Recv( &rcvdMessage, sizeof(struct Message), MPI_CHAR, 
                MPI_ANY_SOURCE, TEMP_TAG, MPI_COMM_WORLD, &status );
-      printf("Process %d received something\n",my_id );
+               
       switch( rcvdMessage.msgType )
       {
          case DATA_MSG: //print message if I'm the destination, redirect if I'm not
             if( rcvdMessage.receiver == my_id )
             {
-               printf("Data found its destination -- Process %d received: '%d' from process %d\n", 
+               printf("Process %d says: Data found its destination, I've received: '%d' from process %d\n", 
                         my_id, rcvdMessage.data, rcvdMessage.sender );
             }
             else
             {
-               printf("Redirecting DATA message" );
+               printf("Process %d says: Redirecting DATA message", my_id );
                MPI_Send( &rcvdMessage, sizeof(struct Message), MPI_CHAR, getNextActiveProcess( ), TEMP_TAG, MPI_COMM_WORLD);
             }
          break;
@@ -135,7 +118,7 @@ main(int argc, char** argv)
             if( allProcessStatus[rcvdMessage.data] == COORDENATOR_PROC )
             {
                //start the start_election process
-               printf("*** COORDINATOR Process %d DIED, process %d will start the Election\n", rcvdMessage.data, my_id );
+               printf("Process %d says: Coordinator Process %d DIED, I will start the ELECTION_CANDIDATURE\n", my_id, rcvdMessage.data );
                sentMessage.sender = my_id;
                sentMessage.receiver = my_id;
                sentMessage.data  = my_id;
@@ -147,7 +130,7 @@ main(int argc, char** argv)
                allProcessStatus[rcvdMessage.data] = DISABLED_PROC;
                if( rcvdMessage.sender == -1 ) //you received the first PROCESS_DIED msg
                {
-                  printf("Process %d DIED, process %d will start the message spreading\n", rcvdMessage.data, my_id );
+                  printf("Process %d says: Process %d DIED, I will start the message spreading\n", my_id, rcvdMessage.data );
                   sentMessage.sender = my_id;
                   sentMessage.receiver = my_id;
                   sentMessage.data = rcvdMessage.data;
@@ -157,11 +140,11 @@ main(int argc, char** argv)
                }
                else if( rcvdMessage.receiver == my_id ) // cycle completed
                {
-                  printf("All the processes were informed of process %d DEAD\n", rcvdMessage.data );
+                  printf("Proces %d says: All the processes were informed of process %d DEAD\n", my_id, rcvdMessage.data );
                }
                else //repass the message
                {
-                  printf("Process %d: Repassing the DEAD of process %d to process %d\n", my_id, rcvdMessage.data, getNextActiveProcess() );
+                  printf("Process %d says: Repassing the DEATH of process %d to process %d\n", my_id, rcvdMessage.data, getNextActiveProcess() );
                   MPI_Send( &rcvdMessage, sizeof(struct Message), MPI_CHAR, getNextActiveProcess( ), TEMP_TAG, MPI_COMM_WORLD);
                }
             }
@@ -173,7 +156,7 @@ main(int argc, char** argv)
             disableCurrentCoordenator( );
             if( rcvdMessage.receiver == my_id ) //cycle completed
             {
-               printf("START_ELECTION_MSG completed the cycle, the next coordenator process is %d proc, spreading the info\n", rcvdMessage.data);
+               printf("Process %d says: ELECTION_CANDIDATURE completed the cycle, the winner, and next coordenator process will be %d, spreading the info\n", my_id, rcvdMessage.data);
                sentMessage.sender = my_id;
                sentMessage.receiver = my_id;
                sentMessage.data = rcvdMessage.data;
@@ -183,7 +166,12 @@ main(int argc, char** argv)
             else
             {
                if( my_id > rcvdMessage.data )
+               {
                   rcvdMessage.data = my_id;
+                  printf("Process %d says: My rank is higher than the current candidate, I'll be the new candidate\n", my_id);
+               }
+               
+               printf("Process %d says: Redirecting the candidature message\n", my_id);
                
                MPI_Send( &rcvdMessage, sizeof(struct Message), MPI_CHAR, getNextActiveProcess( ), TEMP_TAG, MPI_COMM_WORLD);
             }
@@ -196,12 +184,12 @@ main(int argc, char** argv)
             allProcessStatus[rcvdMessage.data] = COORDENATOR_PROC;
             if( rcvdMessage.receiver == my_id ) //cycle completed
             {
-               printf("ELECT_COORDENATOR_MSG completed the cycle, everyone know the new coordenator");
+               printf("Process %d says: ELECT_COORDINATOR complete the cycle, everyone knows the new coordenator \n", my_id);
             }
             else
             {
+               printf("Process %d says: Updating the new coordenator \n", my_id);
                MPI_Send( &rcvdMessage, sizeof(struct Message), MPI_CHAR, getNextActiveProcess( ), TEMP_TAG, MPI_COMM_WORLD);
-         
             }
          break;
       }
