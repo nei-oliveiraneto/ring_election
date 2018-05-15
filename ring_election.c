@@ -83,11 +83,11 @@ main(int argc, char** argv)
    
    // ********* TEST AREA *********** // 
    
-   if(my_id==3)
+   if(my_id==5)
    {
       sentMessage.sender = -1;
-      sentMessage.receiver = 4;
-      sentMessage.data  = 5;
+      sentMessage.receiver = 5;
+      sentMessage.data  = 10;
       sentMessage.msgType = PROCESS_DIED_MSG;
       MPI_Send( &sentMessage, sizeof(struct Message), MPI_CHAR, getNextActiveProcess( ), TEMP_TAG, MPI_COMM_WORLD);
    }
@@ -108,7 +108,7 @@ main(int argc, char** argv)
             }
             else
             {
-               printf("Process %d says: Redirecting DATA message", my_id );
+               printf("Process %d says: Redirecting DATA message\n", my_id );
                MPI_Send( &rcvdMessage, sizeof(struct Message), MPI_CHAR, getNextActiveProcess( ), TEMP_TAG, MPI_COMM_WORLD);
             }
          break;
@@ -118,6 +118,7 @@ main(int argc, char** argv)
             if( allProcessStatus[rcvdMessage.data] == COORDENATOR_PROC )
             {
                //start the start_election process
+               allProcessStatus[rcvdMessage.data] = DISABLED_PROC;
                printf("Process %d says: Coordinator Process %d DIED, I will start the ELECTION_CANDIDATURE\n", my_id, rcvdMessage.data );
                sentMessage.sender = my_id;
                sentMessage.receiver = my_id;
