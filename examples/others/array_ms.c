@@ -30,24 +30,26 @@ main(int argc, char** argv)
         t1 = MPI_Wtime();  // inicia a contagem do tempo
         // papel do mestre
 
-        for( i=1; i < total_process; i++ )
+        
+        //wait for slave to call
+        int total_received = 0;
+        i = 0;
+        while(total_received<total_process-1)
         {
-            memcpy(message, saco[i-1], sizeof(int)*VECTOR_SIZE);
-            MPI_Send(message, VECTOR_SIZE, MPI_INT, i, 1, MPI_COMM_WORLD); // envio trabalho saco[i-1] para escravo com id = i
+            MPI_Recv(message, VECTOR_SIZE, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+            
+            if( message[0] == -1 ) //free slave message
+            {
+                memcpy(message, saco[i++], sizeof(int)*VECTOR_SIZE);
+                MPI_Send(message, VECTOR_SIZE, MPI_INT, status.MPI_SOURCE, 1, MPI_COMM_WORLD);
+            }
+            else
+            {
+                memcpy( saco[status.MPI_SOURCE-1], message, sizeof(int)*VECTOR_SIZE );
+                total_received++;
+            }
         }
         
-        // recebo o resultado
-
-        for( i=1; i < total_process; i++ )
-        {
-            // recebo mensagens de qualquer emissor e com qualquer etiqueta (TAG)
-
-            MPI_Recv(message, VECTOR_SIZE, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-
-            // coloco o resultado no saco na poisicao do emissor-1
-            memcpy( saco[status.MPI_SOURCE-1], message, sizeof(int)*VECTOR_SIZE ); 
-        }
-
         printf("\nKilling all processes");
         for( i=1; i < total_process; i++ ) //kill all processes
         {
@@ -56,7 +58,6 @@ main(int argc, char** argv)
         }
 
         // mostro o saco
-
         printf("\nMestre[%d]: ", my_rank);               
         for( i=0; i < total_process-1; i++ )
         {
@@ -78,6 +79,9 @@ main(int argc, char** argv)
         // recebo mensagem
         while(1)
         {
+            message[0] = -1; //I`m free message
+            MPI_Send(message, VECTOR_SIZE, MPI_INT, 0, 1, MPI_COMM_WORLD);
+            
             MPI_Recv(message, VECTOR_SIZE, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
 
             if( message[0] == -1 ) // suicide message
