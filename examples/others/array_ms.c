@@ -1,19 +1,25 @@
 #include <stdio.h>
+#include <string.h>
 #include "mpi.h"
 #define MAX_TASKS 32
+#define VECTOR_SIZE 8
 
 main(int argc, char** argv)
 {
-    int i;
+    int i, j;
     int my_rank;       // Identificador deste processo
     int total_process;        // Numero de processos disparados pelo usuario na linha de comando (np)  
-    int message;       // Buffer para as mensagens         
-    int saco[MAX_TASKS];      // saco de trabalho    
+    int message[VECTOR_SIZE];       // Buffer para as mensagens         
+    int saco[MAX_TASKS][VECTOR_SIZE];      // saco de trabalho    
     MPI_Status status; // estrutura que guarda o estado de retorno          
 
 
     // inicializo o saco de trabalho
-    for ( i=0 ; i < MAX_TASKS ; saco[i++] = i);
+    for( i=0; i < MAX_TASKS; i++ )
+    {
+      for( j=0; j < VECTOR_SIZE; j++ )
+        saco[i][j] = j;
+    }
         
     MPI_Init(&argc , &argv); // funcao que inicializa o MPI, todo o codigo paralelo estah abaixo
 
@@ -26,18 +32,13 @@ main(int argc, char** argv)
         t1 = MPI_Wtime();  // inicia a contagem do tempo
         // papel do mestre
 
-        // mostro o saco
-
-        printf("\nMestre[%d]: ", my_rank);               
-        for ( i=0 ; i < total_process-1 ; printf("%d ", saco[i++]));
-
-        // mando o trabalho para os escravos fazerem
-
         for ( i=1 ; i < total_process ; i++)
         {
-            message = saco[i-1];
-            MPI_Send(&message, 1, MPI_INT, i, 1, MPI_COMM_WORLD); // envio trabalho saco[i-1] para escravo com id = i
+            memcpy(message, saco[i-1], VECTOR_SIZE);
+            MPI_Send(message, VECTOR_SIZE, MPI_INT, i, 1, MPI_COMM_WORLD); // envio trabalho saco[i-1] para escravo com id = i
         }
+
+        printf("Pegando um dado lhoco: %d\n", saco[2][5]);
         
         // recebo o resultado
 
@@ -45,8 +46,8 @@ main(int argc, char** argv)
         {
             // recebo mensagens de qualquer emissor e com qualquer etiqueta (TAG)
 
-            MPI_Recv(&message,     /* buffer onde ser� colocada a mensagem */
-                1,                 /* uma unidade do dado a ser recebido */
+            MPI_Recv(message,     /* buffer onde ser� colocada a mensagem */
+                VECTOR_SIZE,                 /* uma unidade do dado a ser recebido */
                 MPI_INT,           /* dado do tipo inteiro */
                 MPI_ANY_SOURCE,    /* ler mensagem de qualquer emissor */
                 MPI_ANY_TAG,       /* ler mensagem de qualquer etiqueta (tag) */
@@ -55,20 +56,27 @@ main(int argc, char** argv)
 
             // coloco o resultado no saco na poisi��o do emissor-1
 
-        saco[status.MPI_SOURCE-1] = message;   // status.MPI_SOURCE cont�m o ID do processo que enviou a mensagem que foi recebida
+        memcpy(saco[status.MPI_SOURCE-1], message, VECTOR_SIZE);   // status.MPI_SOURCE cont�m o ID do processo que enviou a mensagem que foi recebida
         }
 
         printf("\nKilling all processes");
         for ( i=1 ; i < total_process ; i++) //kill all processes
         {
-            message = -1;
-            MPI_Send(&message, 1, MPI_INT, i, 1, MPI_COMM_WORLD);
+            message[0] = -1;
+            MPI_Send(message, VECTOR_SIZE, MPI_INT, i, 1, MPI_COMM_WORLD);
         }
 
         // mostro o saco
 
         printf("\nMestre[%d]: ", my_rank);               
-        for ( i=0 ; i < total_process-1 ; printf("%d ", saco[i++]));
+        for ( i=0 ; i < total_process-1; i++)
+        {
+            printf("\n\tItem[%d]: ",i );
+            for( j=0; j < VECTOR_SIZE; j++ )
+            {
+                printf("%d  ", saco[i][j]);
+            }
+        }
         printf("\n\n");
         
         t2 = MPI_Wtime(); // termina a contagem do tempo
@@ -82,9 +90,9 @@ main(int argc, char** argv)
 
         while(1)
         {
-            MPI_Recv(&message, 1, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
+            MPI_Recv(message, VECTOR_SIZE, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
 
-            if( message == -1 ) // suicide message
+            if( message[0] == -1 ) // suicide message
             {
                 printf("\nEscravo[%d]: Goodbye world!", my_rank);
                 break;
@@ -92,12 +100,16 @@ main(int argc, char** argv)
             
             else
             {
-                printf("\nEscravo[%d]: recebi %d", my_rank, message);
-                message = message*message;
+                printf("\nEscravo[%d]: recebi pacote", my_rank);
+                for( i = 0; i < VECTOR_SIZE; i++ )
+                {
+                  printf(" %d", message[i]);
+                  message[i] = message[i]*message[i];
 
+                }
                 // retorno resultado para o mestre
 
-                MPI_Send(&message, 1, MPI_INT, 0, 1, MPI_COMM_WORLD);
+                MPI_Send(message, VECTOR_SIZE, MPI_INT, 0, 1, MPI_COMM_WORLD);
 
             }
         }
