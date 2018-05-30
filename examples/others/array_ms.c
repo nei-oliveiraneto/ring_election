@@ -16,51 +16,40 @@ main(int argc, char** argv)
 
     // inicializo o saco de trabalho
     for( i=0; i < MAX_TASKS; i++ )
-    {
       for( j=0; j < VECTOR_SIZE; j++ )
         saco[i][j] = j;
-    }
         
     MPI_Init(&argc , &argv); // funcao que inicializa o MPI, todo o codigo paralelo estah abaixo
 
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank); // pega pega o numero do processo atual (rank)
     MPI_Comm_size(MPI_COMM_WORLD, &total_process);  // pega informacao do numero de processos (quantidade total)
 
-    if ( my_rank == 0 ) // qual o meu papel: sou o mestre ou um dos escravos?
+    if( my_rank == 0 ) // qual o meu papel: sou o mestre ou um dos escravos?
     {
         double t1,t2;
         t1 = MPI_Wtime();  // inicia a contagem do tempo
         // papel do mestre
 
-        for ( i=1 ; i < total_process ; i++)
+        for( i=1; i < total_process; i++ )
         {
-            memcpy(message, saco[i-1], VECTOR_SIZE);
+            memcpy(message, saco[i-1], sizeof(int)*VECTOR_SIZE);
             MPI_Send(message, VECTOR_SIZE, MPI_INT, i, 1, MPI_COMM_WORLD); // envio trabalho saco[i-1] para escravo com id = i
         }
-
-        printf("Pegando um dado lhoco: %d\n", saco[2][5]);
         
         // recebo o resultado
 
-        for ( i=1 ; i < total_process ; i++)
+        for( i=1; i < total_process; i++ )
         {
             // recebo mensagens de qualquer emissor e com qualquer etiqueta (TAG)
 
-            MPI_Recv(message,     /* buffer onde ser� colocada a mensagem */
-                VECTOR_SIZE,                 /* uma unidade do dado a ser recebido */
-                MPI_INT,           /* dado do tipo inteiro */
-                MPI_ANY_SOURCE,    /* ler mensagem de qualquer emissor */
-                MPI_ANY_TAG,       /* ler mensagem de qualquer etiqueta (tag) */
-                MPI_COMM_WORLD,    /* comunicador padr�o */
-                &status);          /* estrtura com informa��es sobre a mensagem recebida */
+            MPI_Recv(message, VECTOR_SIZE, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
-            // coloco o resultado no saco na poisi��o do emissor-1
-
-        memcpy(saco[status.MPI_SOURCE-1], message, VECTOR_SIZE);   // status.MPI_SOURCE cont�m o ID do processo que enviou a mensagem que foi recebida
+            // coloco o resultado no saco na poisicao do emissor-1
+            memcpy( saco[status.MPI_SOURCE-1], message, sizeof(int)*VECTOR_SIZE ); 
         }
 
         printf("\nKilling all processes");
-        for ( i=1 ; i < total_process ; i++) //kill all processes
+        for( i=1; i < total_process; i++ ) //kill all processes
         {
             message[0] = -1;
             MPI_Send(message, VECTOR_SIZE, MPI_INT, i, 1, MPI_COMM_WORLD);
@@ -69,7 +58,7 @@ main(int argc, char** argv)
         // mostro o saco
 
         printf("\nMestre[%d]: ", my_rank);               
-        for ( i=0 ; i < total_process-1; i++)
+        for( i=0; i < total_process-1; i++ )
         {
             printf("\n\tItem[%d]: ",i );
             for( j=0; j < VECTOR_SIZE; j++ )
@@ -81,13 +70,12 @@ main(int argc, char** argv)
         
         t2 = MPI_Wtime(); // termina a contagem do tempo
         printf("\nTempo de execucao: %f\n\n", t2-t1);
-    }                 
+    }   
+
     else                 
     {
         // papel do escravo
-
         // recebo mensagem
-
         while(1)
         {
             MPI_Recv(message, VECTOR_SIZE, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
