@@ -1,8 +1,34 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "mpi.h"
 #define NUMBER_OF_ARRAYS 20
 #define ARRAY_SIZE 10
+//#define BUBBLE_SORT 0 // comentar para usar quicksort
+
+void bs(int n, int * vetor)
+{
+    int c=0, d, troca, trocou =1;
+
+    while (c < (n-1) & trocou )
+    {
+        trocou = 0;
+        for (d = 0 ; d < n - c - 1; d++)
+            if (vetor[d] > vetor[d+1])
+            {
+                troca      = vetor[d];
+                vetor[d]   = vetor[d+1];
+                vetor[d+1] = troca;
+                trocou = 1;
+            }
+        c++;
+    }
+}
+
+int cmpfunc (const void * a, const void * b)
+{
+   return ( *(int*)a - *(int*)b );
+}
 
 main(int argc, char** argv)
 {
@@ -36,11 +62,12 @@ main(int argc, char** argv)
         int total_received = 0;
         while(total_received<NUMBER_OF_ARRAYS)
         {
+            //recebe mensagem do escravo, pode ser dizendo que esta livre, pode ser com array ordenado
             MPI_Recv(message, ARRAY_SIZE, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
             
-            if( message[0] == -1 ) //free slave message
+            if( message[0] == -1 ) //mensagem de escravo livre
             {
-                if( total_sent < NUMBER_OF_ARRAYS )
+                if( total_sent < NUMBER_OF_ARRAYS ) //se ainda nao enviou todos os arrays do saco
                 {
                     memcpy(message, saco[total_sent++], sizeof(int)*ARRAY_SIZE);
                     MPI_Send(message, ARRAY_SIZE, MPI_INT, status.MPI_SOURCE, 1, MPI_COMM_WORLD);
@@ -79,15 +106,15 @@ main(int argc, char** argv)
     else                 
     {
         // papel do escravo
-        // recebo mensagem
+        // fica em loop infinito ateh receber mensagem de suicidio
         while(1)
         {
-            message[0] = -1; //I`m free message
+            message[0] = -1; //primeira mensagem que envia eh avisando que esta livre
             MPI_Send(message, ARRAY_SIZE, MPI_INT, 0, 1, MPI_COMM_WORLD);
             
             MPI_Recv(message, ARRAY_SIZE, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
 
-            if( message[0] == -1 ) // suicide message
+            if( message[0] == -1 ) // mensagem de suicidio
             {
                 printf("\nEscravo[%d]: Goodbye world!", my_rank);
                 break;
@@ -99,11 +126,17 @@ main(int argc, char** argv)
                 for( i = 0; i < ARRAY_SIZE; i++ )
                 {
                   printf(" %d", message[i]);
-                  message[i] = message[i]*2;
-
                 }
-                // retorno resultado para o mestre
+                
+                #ifdef BUBBLE_SORT 
+                    bs(ARRAY_SIZE, message);
+                #endif
 
+                #ifndef BUBBLE_SORT
+                    qsort(message, ARRAY_SIZE, sizeof(int), cmpfunc);
+                #endif
+               
+                // retorno resultado para o mestre
                 MPI_Send(message, ARRAY_SIZE, MPI_INT, 0, 1, MPI_COMM_WORLD);
 
             }
