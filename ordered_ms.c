@@ -1,23 +1,23 @@
 #include <stdio.h>
 #include <string.h>
 #include "mpi.h"
-#define MAX_TASKS 32
-#define VECTOR_SIZE 8
+#define NUMBER_OF_ARRAYS 20
+#define ARRAY_SIZE 10
 
 main(int argc, char** argv)
 {
     int i, j;
     int my_rank;       // Identificador deste processo
     int total_process;        // Numero de processos disparados pelo usuario na linha de comando (np)  
-    int message[VECTOR_SIZE];       // Buffer para as mensagens         
-    int saco[MAX_TASKS][VECTOR_SIZE];      // saco de trabalho    
+    int message[ARRAY_SIZE];       // Buffer para as mensagens         
+    int saco[NUMBER_OF_ARRAYS][ARRAY_SIZE];      // saco de trabalho    
     MPI_Status status; // estrutura que guarda o estado de retorno          
 
 
     // inicializo o saco de trabalho
-    for( i=0; i < MAX_TASKS; i++ )
-      for( j=0; j < VECTOR_SIZE; j++ )
-        saco[i][j] = j;
+    for( i=0; i < NUMBER_OF_ARRAYS; i++ )
+      for( j=0; j < ARRAY_SIZE; j++ )
+        saco[i][j] = ARRAY_SIZE-j-1;
         
     MPI_Init(&argc , &argv); // funcao que inicializa o MPI, todo o codigo paralelo estah abaixo
 
@@ -32,20 +32,23 @@ main(int argc, char** argv)
 
         
         //wait for slave to call
+        int total_sent = 0;
         int total_received = 0;
-        i = 0;
-        while(total_received<total_process-1)
+        while(total_received<NUMBER_OF_ARRAYS)
         {
-            MPI_Recv(message, VECTOR_SIZE, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+            MPI_Recv(message, ARRAY_SIZE, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
             
             if( message[0] == -1 ) //free slave message
             {
-                memcpy(message, saco[i++], sizeof(int)*VECTOR_SIZE);
-                MPI_Send(message, VECTOR_SIZE, MPI_INT, status.MPI_SOURCE, 1, MPI_COMM_WORLD);
+                if( total_sent < NUMBER_OF_ARRAYS )
+                {
+                    memcpy(message, saco[total_sent++], sizeof(int)*ARRAY_SIZE);
+                    MPI_Send(message, ARRAY_SIZE, MPI_INT, status.MPI_SOURCE, 1, MPI_COMM_WORLD);
+                }
             }
             else
             {
-                memcpy( saco[status.MPI_SOURCE-1], message, sizeof(int)*VECTOR_SIZE );
+                memcpy( saco[total_received], message, sizeof(int)*ARRAY_SIZE );
                 total_received++;
             }
         }
@@ -54,15 +57,15 @@ main(int argc, char** argv)
         for( i=1; i < total_process; i++ ) //kill all processes
         {
             message[0] = -1;
-            MPI_Send(message, VECTOR_SIZE, MPI_INT, i, 1, MPI_COMM_WORLD);
+            MPI_Send(message, ARRAY_SIZE, MPI_INT, i, 1, MPI_COMM_WORLD);
         }
 
         // mostro o saco
         printf("\nMestre[%d]: ", my_rank);               
-        for( i=0; i < total_process-1; i++ )
+        for( i=0; i < NUMBER_OF_ARRAYS; i++ )
         {
             printf("\n\tItem[%d]: ",i );
-            for( j=0; j < VECTOR_SIZE; j++ )
+            for( j=0; j < ARRAY_SIZE; j++ )
             {
                 printf("%d  ", saco[i][j]);
             }
@@ -80,9 +83,9 @@ main(int argc, char** argv)
         while(1)
         {
             message[0] = -1; //I`m free message
-            MPI_Send(message, VECTOR_SIZE, MPI_INT, 0, 1, MPI_COMM_WORLD);
+            MPI_Send(message, ARRAY_SIZE, MPI_INT, 0, 1, MPI_COMM_WORLD);
             
-            MPI_Recv(message, VECTOR_SIZE, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
+            MPI_Recv(message, ARRAY_SIZE, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
 
             if( message[0] == -1 ) // suicide message
             {
@@ -93,15 +96,15 @@ main(int argc, char** argv)
             else
             {
                 printf("\nEscravo[%d]: recebi pacote", my_rank);
-                for( i = 0; i < VECTOR_SIZE; i++ )
+                for( i = 0; i < ARRAY_SIZE; i++ )
                 {
                   printf(" %d", message[i]);
-                  message[i] = message[i]*message[i];
+                  message[i] = message[i]*2;
 
                 }
                 // retorno resultado para o mestre
 
-                MPI_Send(message, VECTOR_SIZE, MPI_INT, 0, 1, MPI_COMM_WORLD);
+                MPI_Send(message, ARRAY_SIZE, MPI_INT, 0, 1, MPI_COMM_WORLD);
 
             }
         }
