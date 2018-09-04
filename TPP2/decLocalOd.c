@@ -56,26 +56,24 @@ void BubbleSort( int * vetor, int n )
         }
 }
 
-int * Interleaving( int * vetor, int tam )
+int * Interleaving( int * vetor1, int * vetor2, int vetor1size, int vetor2size )
 {
 	int *vetor_auxiliar;
 	int i1, i2, i_aux;
+   int total_tam = vetor1size+vetor2size;
 
-	vetor_auxiliar = (int *)malloc(sizeof(int) * tam);
+	vetor_auxiliar = (int *)malloc(sizeof(int) * total_tam );
 
 	i1 = 0;
-	i2 = tam / 2;
+	i2 = 0;
 
-	for (i_aux = 0; i_aux < tam; i_aux++) {
-		if (((vetor[i1] <= vetor[i2]) && (i1 < (tam / 2)))
-		    || (i2 == tam))
-			vetor_auxiliar[i_aux] = vetor[i1++];
+	for (i_aux = 0; i_aux < total_tam; i_aux++) {
+		if (((vetor1[i1] <= vetor2[i2]) && (i1 < vetor1size))
+		    || (i2 == vetor2size))
+			vetor_auxiliar[i_aux] = vetor1[i1++];
 		else
-			vetor_auxiliar[i_aux] = vetor[i2++];
+			vetor_auxiliar[i_aux] = vetor2[i2++];
 	}
-
-   if(tam==1000)for( int i = 0; i < tam; i++ )
-         printf( "%d: %d\n", i, vetor_auxiliar[i] );
 
    return vetor_auxiliar;
 }
@@ -99,6 +97,7 @@ int main(int argc, char** argv)
    int my_rank, total_proc;
    int localVectorSize, fatherPID, son1PID, son2PID;
    int * localVector = NULL;
+   int * localSortingVector = NULL;
 
    double t1,t2;
    // int auxVector[TOTAL_ARRAY_SIZE];
@@ -135,7 +134,6 @@ int main(int argc, char** argv)
    }
 
    // dividir ou conquistar?
-   int * interleavedVector;
 
    if ( son1PID == -1 )
    {
@@ -143,15 +141,32 @@ int main(int argc, char** argv)
    }
    else
    {
+      //separar sua parte para ordenacao local
+
+      int localSortingVectorSize = TOTAL_ARRAY_SIZE/total_proc;
+
+      if( (localVectorSize - localSortingVectorSize) % 2 != 0 )
+         localSortingVectorSize++;
+
+      localSortingVector = localVector;
+      localVector = &localVector[localSortingVectorSize]; 
+
+      int vectorToSonsSize = localVectorSize - localSortingVectorSize;
+
+      
       // dividir
       // quebrar em duas partes e mandar para os filhos
 
-      int halfIndex = localVectorSize/2;
+      int halfIndex = ( vectorToSonsSize ) / 2;
       MPI_Send( &localVector[0], halfIndex, MPI_INT, son1PID, 1, MPI_COMM_WORLD );  // mando metade inicial do vetor
       MPI_Send( &localVector[halfIndex], halfIndex, MPI_INT, son2PID, 1, MPI_COMM_WORLD );  // mando metade inicial do vetor
 
-      // receber dos filhos
+      //ordena localmente
 
+      BubbleSort( localSortingVector, localSortingVectorSize );
+
+
+      // receber dos filhos
 
       MPI_Recv( &localVector[0], halfIndex, MPI_INT, 
                son1PID, 1, MPI_COMM_WORLD, &status );
@@ -163,7 +178,8 @@ int main(int argc, char** argv)
  
       //memcpy( localVector, Interleaving( localVector, localVectorSize ), localVectorSize);
    
-      localVector = Interleaving( localVector, localVectorSize );
+      localVector = Interleaving( &localVector[0], &localVector[halfIndex], halfIndex, halfIndex );
+      localVector = Interleaving( &localSortingVector[0], &localVector[0], localSortingVectorSize ,vectorToSonsSize );
       
      
    }
