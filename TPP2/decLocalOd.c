@@ -3,7 +3,15 @@
 #include <string.h>
 #include "mpi.h"
 
-#define TOTAL_ARRAY_SIZE 100000
+#ifdef KK
+   #define TOTAL_ARRAY_SIZE 1000000
+#else 
+   #define TOTAL_ARRAY_SIZE 100000
+#endif
+
+int cmpfunc (const void * a, const void * b) {
+   return ( *(int*)a - *(int*)b );
+}
 
 
 void InitVector( int * vector, int size )
@@ -125,19 +133,23 @@ int main(int argc, char** argv)
 
    }
    else
-   {
-      t1 = MPI_Wtime();
-      
+   {  
       localVector = (int *)malloc(sizeof(int) * TOTAL_ARRAY_SIZE );
       InitVector( localVector, TOTAL_ARRAY_SIZE );      // sou a raiz e portanto gero o vetor - ordem reversa
       localVectorSize = TOTAL_ARRAY_SIZE;
+
+      t1 = MPI_Wtime();
    }
 
    // dividir ou conquistar?
 
    if ( son1PID == -1 )
    {
-      BubbleSort( localVector, localVectorSize );  // conquisto
+      #ifdef QSORT
+         qsort(localVector, localVectorSize, sizeof(int), cmpfunc);
+      #else
+         BubbleSort( localVector, localVectorSize );  // conquisto
+      #endif
    }
    else
    {
@@ -163,7 +175,11 @@ int main(int argc, char** argv)
 
       //ordena localmente
 
-      BubbleSort( localSortingVector, localSortingVectorSize );
+      #ifdef QSORT
+         qsort(localSortingVector, localSortingVectorSize, sizeof(int), cmpfunc);
+      #else
+         BubbleSort( localSortingVector, localSortingVectorSize );  // conquisto
+      #endif
 
 
       // receber dos filhos
