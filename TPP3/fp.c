@@ -86,7 +86,9 @@ int main(int argc, char** argv)
    {
 
       // ordeno vetor local
+      printf("To ordenando?\n");
       BubbleSort( localVector, localPartSize ); 
+      printf("To sim\n");
 
       // verifico condição de parada
 
@@ -101,14 +103,19 @@ int main(int argc, char** argv)
       {
          MPI_Recv( &leftBiggerElement, 1, MPI_INT, 
                my_rank-1, 1, MPI_COMM_WORLD, &status );
+        
+         // comparo se o meu menor elemento é maior do que o maior elemento recebido (se sim, estou ordenado em relação ao meu vizinho)
+         if( localVector[0] > leftBiggerElement )
+            isOrdenedNeighbour = 1;
+         else
+            isOrdenedNeighbour = 0;
+         
       }
-
-      // comparo se o meu menor elemento é maior do que o maior elemento recebido (se sim, estou ordenado em relação ao meu vizinho)
-      if( localVector[0] > leftBiggerElement )
-         isOrdenedNeighbour = 1;
       else
-         isOrdenedNeighbour = 0;
-      
+         isOrdenedNeighbour = 1;
+
+      printf( "Processo %d esta %d com o vizinho\n", my_rank, isOrdenedNeighbour );
+
       // compartilho o meu estado com todos os processos
       int receivedState;
       isReady = isOrdenedNeighbour;
@@ -116,7 +123,8 @@ int main(int argc, char** argv)
       {
          if( my_rank == total_proc )
          {
-            MPI_Bcast( &isOrdenedNeighbour, 1, MPI_INT, my_rank, MPI_COMM_WORLD );   
+            printf( "%d is sending %d to all\n", my_rank, isOrdenedNeighbour );
+            MPI_Bcast( &isOrdenedNeighbour, 1, MPI_INT, my_rank, MPI_COMM_WORLD ); 
          }
          else
          {
