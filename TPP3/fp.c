@@ -6,6 +6,14 @@
 #define TOTAL_ARRAY_SIZE 1000
 #define EXGANGE_DELTA 20 //in percentage
 
+void printVector( int* vector, int size, int my_rank )
+{
+   printf( "Process %d: ", my_rank );
+   for( int i = 0; i < size; i++ )
+      printf( "%d, ", vector[i]);
+   printf("\n");
+}
+
 int * InitVector( int np, int rank )
 {
    int localPartSize = TOTAL_ARRAY_SIZE/np;
@@ -86,9 +94,10 @@ int main(int argc, char** argv)
    {
 
       // ordeno vetor local
-      printf("To ordenando?\n");
       BubbleSort( localVector, localPartSize ); 
-      printf("To sim\n");
+
+      printVector(localVector, localPartSize, my_rank);
+      
 
       // verifico condição de parada
 
@@ -114,20 +123,21 @@ int main(int argc, char** argv)
       else
          isOrdenedNeighbour = 1;
 
-      printf( "Processo %d esta %d com o vizinho\n", my_rank, isOrdenedNeighbour );
+      //printf( "Processo %d esta %d com o vizinho\n", my_rank, isOrdenedNeighbour );
 
       // compartilho o meu estado com todos os processos
       int receivedState;
       isReady = isOrdenedNeighbour;
       for( int i = 0; i < total_proc; i++ )
       {
-         if( my_rank == total_proc )
+         if( my_rank == i )
          {
-            printf( "%d is sending %d to all\n", my_rank, isOrdenedNeighbour );
+            //printf( "%d is sending %d to all\n", my_rank, isOrdenedNeighbour );
             MPI_Bcast( &isOrdenedNeighbour, 1, MPI_INT, my_rank, MPI_COMM_WORLD ); 
          }
          else
          {
+            //printf( "%d is receiving from %d\n", my_rank, i );
             MPI_Bcast( &receivedState, 1, MPI_INT, i, MPI_COMM_WORLD );
             isReady = isReady && receivedState;
          }
@@ -135,6 +145,7 @@ int main(int argc, char** argv)
 
       // se todos estiverem ordenados com seus vizinhos, a ordenação do vetor global está pronta ( pronto = TRUE, break)
       // senão continuo
+      printf( "%d: Estou pronto: %d\n", my_rank, isReady );
       if( isReady )
          break;
 
@@ -153,10 +164,10 @@ int main(int argc, char** argv)
                my_rank+1, 1, MPI_COMM_WORLD, &status );
       
          // ordeno estes valores com a parte mais alta do meu vetor local 
-         BubbleSort( &localVector[localPartSize-exchangeDelta-1], exchangeDelta*2 );
+         BubbleSort( &localVector[localPartSize-exchangeDelta], exchangeDelta*2 );
 
          // devolvo os valores que recebi para a direita
-         MPI_Send( &localVector[localPartSize-exchangeDelta-1], exchangeDelta, MPI_INT, my_rank+1, 1, MPI_COMM_WORLD ); 
+         MPI_Send( &localVector[localPartSize], exchangeDelta, MPI_INT, my_rank+1, 1, MPI_COMM_WORLD ); 
 
       }
 
