@@ -3,7 +3,7 @@
 #include <string.h>
 #include "mpi.h"
 
-#define TOTAL_ARRAY_SIZE 1000
+#define TOTAL_ARRAY_SIZE 100000
 #define EXGANGE_DELTA 20 //in percentage
 
 void printVector( int* vector, int size, int my_rank )
@@ -12,6 +12,18 @@ void printVector( int* vector, int size, int my_rank )
    for( int i = 0; i < size; i++ )
       printf( "%d, ", vector[i]);
    printf("\n");
+}
+
+int isVectorOrdered( int * vector, int nProcesses, int processId, int size )
+{
+   int startingPoint = TOTAL_ARRAY_SIZE/nProcesses*processId;
+   for( int i = 0; i < size; i++ )
+      if( vector[i] != startingPoint+i )
+      {
+         printf( "########## Deu ruim no %d, i=%d, vector[i]=%d, startingPoint+i = %d\n\n", processId, i, vector[i],startingPoint+i);
+         return 0;
+      }
+   return 1;
 }
 
 int * InitVector( int np, int rank )
@@ -90,15 +102,15 @@ int main(int argc, char** argv)
       localPartSize = localPartSize + TOTAL_ARRAY_SIZE%total_proc; 
    }
 
+   double t1, t2;
+   t1 = MPI_Wtime( );
+
    while( !isReady )
    {
 
       // ordeno vetor local
       BubbleSort( localVector, localPartSize ); 
-
-      printVector(localVector, localPartSize, my_rank);
       
-
       // verifico condição de parada
 
       // se não for np-1, mando o meu maior elemento para a direita
@@ -123,7 +135,6 @@ int main(int argc, char** argv)
       else
          isOrdenedNeighbour = 1;
 
-      //printf( "Processo %d esta %d com o vizinho\n", my_rank, isOrdenedNeighbour );
 
       // compartilho o meu estado com todos os processos
       int receivedState;
@@ -132,12 +143,10 @@ int main(int argc, char** argv)
       {
          if( my_rank == i )
          {
-            //printf( "%d is sending %d to all\n", my_rank, isOrdenedNeighbour );
             MPI_Bcast( &isOrdenedNeighbour, 1, MPI_INT, my_rank, MPI_COMM_WORLD ); 
          }
          else
          {
-            //printf( "%d is receiving from %d\n", my_rank, i );
             MPI_Bcast( &receivedState, 1, MPI_INT, i, MPI_COMM_WORLD );
             isReady = isReady && receivedState;
          }
@@ -145,7 +154,6 @@ int main(int argc, char** argv)
 
       // se todos estiverem ordenados com seus vizinhos, a ordenação do vetor global está pronta ( pronto = TRUE, break)
       // senão continuo
-      printf( "%d: Estou pronto: %d\n", my_rank, isReady );
       if( isReady )
          break;
 
@@ -181,7 +189,16 @@ int main(int argc, char** argv)
 
    }
 
-   MPI_Finalize();
+   t2 = MPI_Wtime(); // termina a contagem do tempo
+
+   if( isVectorOrdered( localVector, total_proc, my_rank, localPartSize) )
+      printf( "Processo %d: Vetor corretamente ordenado!\n", my_rank );
+   else
+      printf( "Processo %d: Falha na ordenação do vetor!\n", my_rank );
+   
+   printf( "Processo %d: Tempo de execucao: %f\n\n", my_rank, t2-t1 );
+
+   MPI_Finalize( );
 
 
 }
